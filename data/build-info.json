@@ -1,0 +1,47 @@
+{
+  "area": "citywide",
+  "asOf": "2026-10-05",
+  "profile": "moped",
+  "profileVersion": "0.8.1",
+  "tunedOn": "2026-10-04",
+  "sources": {
+    "lion": {
+      "fetched": "2026-10-03",
+      "release": "26c"
+    },
+    "speed_limits": {
+      "fetched": "2026-10-03"
+    },
+    "bike_routes": {
+      "fetched": "2026-10-03"
+    },
+    "bus_lanes": {
+      "fetched": "2026-10-03"
+    },
+    "truck_routes": {
+      "fetched": "2026-10-03"
+    },
+    "pavement_ratings": {
+      "fetched": "2026-10-03"
+    },
+    "traffic_volumes": {
+      "fetched": "2026-10-03"
+    },
+    "crashes": {
+      "fetched": "2026-10-03",
+      "window": [
+        "2023-10-03",
+        "2026-06-11"
+      ]
+    },
+    "street_closures": {
+      "fetched": "2026-10-05"
+    },
+    "open_streets": {
+      "fetched": "2026-10-03"
+    },
+    "osm": {
+      "fetched": "2026-10-05"
+    }
+  }
+}
