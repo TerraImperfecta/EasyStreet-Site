@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Easy Street</title>
+<meta name="description" content="NYC streets colored by how calm they are to ride on a moped.">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.css">
+<!-- Wordmark (#46, D-017): Space Grotesk Bold, subset to the title's letters. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&text=Easy%20Street&display=swap">
+<style>
+  :root {
+    --bg: #F3EFE6; --panel: #ffffffee; --ink: #1F2833; --muted: #5b6672; --line: #d9d2c3;
+    --teal: #1E8A6E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1F2833; --panel: #1F2833ee; --ink: #F3EFE6; --muted: #aab3bd; --line: #36424F;
+      --teal: #5FD6A6;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1F2833; --panel: #1F2833ee; --ink: #F3EFE6; --muted: #aab3bd; --line: #36424F;
+    --teal: #5FD6A6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  #map { position: absolute; inset: 0; }
+  .panel { position: absolute; top: 12px; left: 12px; width: 260px; z-index: 2;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; box-shadow: 0 2px 12px #0002; }
+  h1 { font: 700 19px/1 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.01em; margin: 0;
+    display: flex; align-items: center; gap: 8px; }
+  h1 .mark { width: 26px; height: 26px; color: var(--teal); }
+  .tag { color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 10px; }
+  legend.l { font-size: 12px; font-weight: 600; margin-bottom: 4px; padding: 0; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg label { flex: 1; text-align: center; padding: 5px 0; cursor: pointer; font-size: 13px; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg input:checked + span { font-weight: 700; }
+  .seg label:has(input:checked) { background: var(--teal); color: #fff; }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--teal); outline-offset: -2px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .check { display: flex; gap: 6px; align-items: center; font-size: 13px; margin: 6px 0 10px; }
+  .check.sub { margin: -4px 0 10px 22px; }
+  .check.sub:has(input:disabled) { opacity: .45; }
+  #legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 13px; }
+  /* Swatches sit on a chip of basemap colour: the map's colours are chosen for a light map (#24). */
+  #legend .sw { width: 24px; border-radius: 2px; flex: none; height: 4px; box-shadow: 0 0 0 3px #F2F1EE; margin: 0 3px; }
+  #legend .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; background: #fff; flex: none; box-sizing: border-box; }
+  #legend .diamond { width: 9px; height: 9px; background: #F9B557; border: 2px solid #1F2833; transform: rotate(45deg); box-sizing: border-box; }
+  #legend .chip { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 16px; border-radius: 3px; background: #F2F1EE; flex: none; }
+  #legend .sw.dash { height: 3px; background: repeating-linear-gradient(90deg, #5B6470 0 6px, #F2F1EE 6px 10px); }
+  #legend .range { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+  #asof { color: var(--muted); font-size: 11px; margin-top: 10px; }
+  .note { color: var(--muted); font-size: 11px; margin-top: 6px; }
+  #tip { position: absolute; z-index: 3; pointer-events: none; background: var(--panel);
+    color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px;
+    font-size: 12px; box-shadow: 0 2px 8px #0003; max-width: 240px; }
+  .inspector { position: absolute; top: 12px; right: 56px; width: 340px; max-height: calc(100% - 60px);
+    overflow: auto; z-index: 3; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; box-shadow: 0 2px 12px #0003; }
+  .inspector h2 { font-size: 16px; margin: 0 26px 2px 0; }
+  .inspector h3 { font-size: 13px; margin: 14px 0 4px; }
+  .inspector .sub, .inspector .muted, .inspector .note, .inspector .sources { color: var(--muted); font-size: 12px; }
+  .inspector .sources { margin-top: 10px; font-size: 11px; }
+  .inspector .close { position: absolute; top: 8px; right: 10px; border: 0; background: none;
+    color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+  .inspector .verdict { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .inspector .verdict.no { font-size: 13px; }
+  .inspector .big { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .inspector .chip { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .inspector table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+  .inspector td { padding: 2px 0; vertical-align: top; }
+  .inspector td:last-child { text-align: right; font-variant-numeric: tabular-nums; padding-left: 8px; }
+  .inspector .facts td:first-child { color: var(--muted); }
+  .inspector .facts td:last-child { text-align: left; }
+  .inspector .neg { color: #c0392b; } .inspector .pos { color: #1a9850; }
+  .inspector .warn { margin-top: 6px; font-size: 12px; color: #b9770e; }
+  .inspector a { color: var(--teal); font-size: 12.5px; }
+  .inspector .sv { display: inline-block; margin-top: 6px; }
+  .inspector .links { margin-top: 10px; }
+  .tune { width: 100%; margin: 0 0 10px; padding: 6px; border: 1px solid var(--line);
+    border-radius: 8px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+  .tune:hover { border-color: var(--teal); }
+  .weights { position: absolute; top: 12px; left: 12px; width: 320px; max-height: calc(100% - 60px);
+    overflow: auto; z-index: 4; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; box-shadow: 0 2px 12px #0003; font-size: 12.5px; }
+  .weights .wp-head { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+  .weights .close { border: 0; background: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+  .weights .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 8px 0 4px; }
+  .weights .metrics div { border: 1px solid var(--line); border-radius: 8px; padding: 4px; text-align: center; }
+  .weights .metrics span { display: block; color: var(--muted); font-size: 10.5px; }
+  .weights .metrics b { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .weights .hint { color: var(--muted); font-size: 11px; margin: 4px 0; }
+  .weights ul { margin: 4px 0; padding-left: 16px; }
+  .weights .grp { border-top: 1px solid var(--line); padding: 6px 0; }
+  .weights label { display: grid; grid-template-columns: 1fr 110px 38px; align-items: center; gap: 6px; }
+  .weights label.val span { color: var(--muted); padding-left: 8px; }
+  .weights output { text-align: right; font-variant-numeric: tabular-nums; }
+  .weights input[type=range] { width: 100%; accent-color: var(--teal); }
+  .weights details summary { color: var(--muted); font-size: 11px; cursor: pointer; margin: 2px 0; }
+  .weights .wp-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .weights .wp-actions button { flex: 1; padding: 6px; border: 1px solid var(--line); border-radius: 8px;
+    background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+  .rating .rm-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .rating .rm-head .rm-x { margin-left: auto; }
+  .rating .rm-street { font-size: 18px; font-weight: 600; margin: 4px 0 2px; }
+  .rating .rm-rate { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0 4px; }
+  .rating button { padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent;
+    color: var(--ink); font: inherit; cursor: pointer; }
+  .rating .rm-rate button { font-size: 16px; font-weight: 600; }
+  .rating .rm-rate button.on { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .rating textarea { width: 100%; box-sizing: border-box; margin: 8px 0; font: inherit; padding: 6px;
+    border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); }
+  .rating .rm-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rating .rm-nav button:last-child { flex-basis: 100%; }
+  .rating .rm-scale, .rating .rm-keys { font-size: 11px; }
+  .rating .sv { display: inline-block; margin: 8px 0 0; }
+  @media (max-width: 640px) {
+    .weights { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 60%; border-radius: 14px 14px 0 0; }
+    .inspector { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 55%;
+      border-radius: 14px 14px 0 0; }
+    .panel { left: 16px; right: 64px; width: auto; top: 12px; padding: 10px 12px; }
+    #legend { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+    .tag, .note { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="Map of NYC streets colored by moped comfort"></div>
+<div class="panel">
+  <h1><svg class="mark" viewBox="0 0 1024 1024" aria-hidden="true"><path d="M 105 695 H 580 Q 650 695 650 625 V 435 Q 650 365 720 365 H 919" fill="none" stroke="currentColor" stroke-width="130" stroke-linecap="round" stroke-linejoin="round"/></svg>Easy Street</h1>
+  <div class="tag">NYC streets by how calm they are to ride on a moped.</div>
+
+  <fieldset>
+    <legend class="l">Moped class</legend>
+    <div class="seg">
+      <label><input type="radio" name="cls" value="A"><span>A</span></label>
+      <label><input type="radio" name="cls" value="B"><span>B</span></label>
+      <label><input type="radio" name="cls" value="C"><span>C</span></label>
+    </div>
+    <div class="hint">A up to 40 mph · B up to 30 · C up to 20</div>
+  </fieldset>
+
+  <label class="check"><input type="checkbox" id="showIllegal"> Show streets mopeds can't use</label>
+  <label class="check"><input type="checkbox" id="alwaysRestricted"> Score bus lanes as always in force</label>
+  <label class="check"><input type="checkbox" id="showHazards"> Show risky crossings</label>
+  <label class="check sub"><input type="checkbox" id="showSignalized"> Include signalized ones</label>
+  <label class="check"><input type="checkbox" id="showConstruction"> Show construction</label>
+  <label class="check"><input type="checkbox" id="showOpenStreets"> Show Open Streets</label>
+  <button id="tune" class="tune" type="button">Tune weights</button>
+  <button id="rate" class="tune" type="button">Rate a sheet…</button>
+  <input id="rateFile" type="file" accept=".csv,text/csv" hidden>
+
+  <div id="legend" aria-label="Legend"></div>
+  <div class="note">Each street shows its less comfortable legal direction. Arrows mark one-ways
+    from street level. Click a street for its breakdown. Scores reflect data, not observed conditions — calmer, not safe.</div>
+  <div id="asof"></div>
+</div>
+<div id="tip" hidden></div>
+<aside id="inspector" class="inspector" hidden aria-live="polite"></aside>
+<aside id="weights" class="weights" hidden aria-label="Weights"></aside>
+<aside id="rating" class="weights rating" hidden aria-label="Rating sheet" aria-live="polite"></aside>
+<!-- pmtiles imports fflate by bare name; map it to its ES module build (no bundler, D-009). -->
+<script type="importmap">
+  { "imports": { "fflate": "https://unpkg.com/fflate@0.8.3/esm/browser.js" } }
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
